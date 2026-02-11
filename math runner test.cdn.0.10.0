@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Prime Runner - BY blueisancat</title>
+    <meta name="description" content="A 3D math game where you dodge composite numbers and collect primes!">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Montserrat:wght@300;500;700&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Three.js libraries -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <style>
+        /* Modern 3D-ready styling */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00ffff;
+            --secondary: #ff00ff;
+            --accent: #ffff00;
+            --dark: #0a0a1a;
+            --glass: rgba(10, 20, 40, 0.85);
+            --glow-primary: 0 0 20px rgba(0, 255, 255, 0.7);
+            --font-title: 'Orbitron', sans-serif;
+            --font-body: 'Montserrat', sans-serif;
+            --font-digital: 'Exo 2', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--dark);
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 1;
+        }
+
+        /* 3D HUD with glass morphism */
+        #hud {
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+            width: 100%;
+            padding: 25px;
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .hud-panel {
+            background: var(--glass);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px 30px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 30px rgba(0, 255, 255, 0.1);
+            display: flex;
+            gap: 40px;
+            transform: translateZ(50px);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateZ(50px); }
+            50% { transform: translateY(-5px) translateZ(50px); }
+        }
+
+        .hud-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hud-label {
+            font-size: 14px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: var(--font-digital);
+            text-shadow: var(--glow-primary);
+        }
+
+        .hud-value {
+            font-size: 32px;
+            font-weight: 900;
+            font-family: var(--font-title);
+            color: white;
+            text-shadow: 0 0 20px rgba(0,255,255,0.7);
+            line-height: 1.2;
+        }
+
+        /* 3D Menu Screens */
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, rgba(10,10,30,0.95), rgba(5,5,20,0.98));
+            backdrop-filter: blur(20px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .menu-card {
+            background: rgba(20, 30, 50, 0.7);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 30px;
+            padding: 50px;
+            max-width: 600px;
+            width: 90%;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.2),
+                        inset 0 0 30px rgba(0, 255, 255, 0.1);
+            transform: perspective(1000px) rotateX(5deg);
+            animation: cardFloat 4s ease-in-out infinite;
+        }
+
+        @keyframes cardFloat {
+            0%, 100% { transform: perspective(1000px) rotateX(5deg) translateY(0); }
+            50% { transform: perspective(1000px) rotateX(5deg) translateY(-10px); }
+        }
+
+        .menu-title {
+            font-family: var(--font-title);
+            font-size: 4em;
+            text-align: center;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(0,255,255,0.5);
+            letter-spacing: 4px;
+        }
+
+        .button-3d {
+            background: linear-gradient(135deg, rgba(0,255,255,0.2), rgba(255,0,255,0.2));
+            border: 2px solid rgba(0,255,255,0.5);
+            color: white;
+            padding: 15px 40px;
+            margin: 15px;
+            font-size: 1.2em;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 0 rgba(0,200,255,0.3);
+            transform: translateY(-3px);
+        }
+
+        .button-3d:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 0 rgba(0,200,255,0.4), 0 0 30px rgba(0,255,255,0.6);
+            border-color: rgba(255,0,255,0.5);
+        }
+
+        .button-3d:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 0 rgba(0,200,255,0.4);
+        }
+
+        /* Mobile controls - 3D style */
+        .mobile-controls {
+            position: fixed;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+            z-index: 150;
+            pointer-events: none;
+        }
+
+        .control-3d {
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 255, 255, 0.15);
+            border: 2px solid rgba(0, 255, 255, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 10px 0 rgba(0, 100, 255, 0.3),
+                        0 0 30px rgba(0, 255, 255, 0.3);
+            transform: perspective(500px) rotateX(20deg);
+        }
+
+        .control-3d:active {
+            transform: perspective(500px) rotateX(20deg) translateY(8px);
+            box-shadow: 0 2px 0 rgba(0, 100, 255, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .hud-panel { padding: 15px; gap: 20px; }
+            .hud-value { font-size: 24px; }
+            .menu-title { font-size: 2.5em; }
+        }
+
+        /* Particle effects */
+        .particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        /* Loader with 3D effect */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1a1a2e, #0a0a1a);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease;
+        }
+
+        .loader-3d {
+            text-align: center;
+            transform: perspective(1000px) rotateX(10deg);
+        }
+
+        .loader-3d h1 {
+            font-size: 5em;
+            font-family: var(--font-title);
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 50px rgba(0,255,255,0.5);
+            animation: loaderPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes loaderPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.9; }
+        }
+
+        .skip-button {
+            background: rgba(255,68,68,0.3);
+            border: 2px solid #ff4444;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            margin-top: 30px;
+            font-size: 1.2em;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,68,68,0.5);
+            box-shadow: 0 0 20px rgba(255,68,68,0.3);
+        }
+
+        .skip-button:hover {
+            background: rgba(255,68,68,0.5);
+            box-shadow: 0 0 40px rgba(255,68,68,0.5);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loader Screen -->
+    <div id="loader">
+        <div class="loader-3d">
+            <h1>PRIME RUNNER</h1>
+            <div style="width: 300px; height: 4px; background: rgba(0,255,255,0.2); margin: 40px auto; border-radius: 2px; overflow: hidden;">
+                <div id="progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00ffff, #ff00ff); transition: width 0.3s;"></div>
+            </div>
+            <button id="skipButton" class="skip-button">⏵ SKIP INTRO</button>
+        </div>
+    </div>
+
+    <!-- 3D HUD -->
+    <div id="hud">
+        <div class="hud-panel">
+            <div class="hud-item">
+                <span class="hud-label">🔢 SCORE</span>
+                <span id="scoreValue" class="hud-value">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">💎 PRIMES</span>
+                <span id="primesValue" class="hud-value">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">⚡ SPEED</span>
+                <span id="speedValue" class="hud-value">5</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div class="mobile-controls">
+        <button id="leftBtn" class="control-3d">◀</button>
+        <button id="rightBtn" class="control-3d">▶</button>
+    </div>
+
+    <!-- Game Screens -->
+    <div id="menuScreen" class="screen active">
+        <div class="menu-card">
+            <h1 class="menu-title">PRIME RUNNER 3D</h1>
+            <div style="text-align: center;">
+                <button id="startGameBtn" class="button-3d">▶ START GAME</button>
+                <button id="howToPlayBtn" class="button-3d">❓ HOW TO PLAY</button>
+            </div>
+            <p style="color: rgba(255,255,255,0.7); margin-top: 30px; text-align: center; font-size: 1.1em;">
+                Collect primes (🟢), avoid composites (🔴)!
+            </p>
+        </div>
+    </div>
+
+    <div id="howToPlayScreen" class="screen">
+        <div class="menu-card">
+            <h1 class="menu-title">HOW TO PLAY</h1>
+            <div style="color: white; font-size: 1.2em; line-height: 2; margin: 30px 0;">
+                <p>🎮 Use <strong style="color: #00ffff;">A/D</strong> or <strong style="color: #00ffff;">←/→</strong> keys</p>
+                <p>📱 Tap left/right buttons on mobile</p>
+                <p>🟢 Green numbers = PRIMES +10 pts</p>
+                <p>🔴 Red numbers = COMPOSITES -5 pts</p>
+                <p>⚡ Speed increases every 100 pts</p>
+            </div>
+            <button id="backFromHowTo" class="button-3d">BACK</button>
+        </div>
+    </div>
+
+    <div id="gameOverScreen" class="screen">
+        <div class="menu-card">
+            <h1 class="menu-title">GAME OVER</h1>
+            <div style="color: white; font-size: 1.5em; margin: 30px 0; text-align: center;">
+                <p>Final Score: <span id="finalScore" style="color: #00ffff; font-weight: 900;">0</span></p>
+                <p>Primes Collected: <span id="finalPrimes" style="color: #ff00ff;">0</span></p>
+            </div>
+            <div style="text-align: center;">
+                <button id="restartFromGameOver" class="button-3d">🔄 PLAY AGAIN</button>
+                <button id="menuFromGameOver" class="button-3d">🏠 MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ============ 3D SCENE SETUP ============
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 15);
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // ============ LIGHTING SYSTEM ============
+        // Ambient light for base illumination
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        
+        // Main directional light (simulating sun)
+        const mainLight = new THREE.DirectionalLight(0xffaaff, 1.2);
+        mainLight.position.set(5, 10, 7);
+        mainLight.castShadow = true;
+        mainLight.receiveShadow = true;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        scene.add(mainLight);
+        
+        // Fill lights
+        const fillLight1 = new THREE.PointLight(0x44aaff, 0.5);
+        fillLight1.position.set(-5, 0, 10);
+        scene.add(fillLight1);
+        
+        const fillLight2 = new THREE.PointLight(0xff44aa, 0.3);
+        fillLight2.position.set(5, 2, -5);
+        scene.add(fillLight2);
+        
+        // Add a glowing rim light
+        const rimLight = new THREE.PointLight(0x88ddff, 0.8);
+        rimLight.position.set(-2, 3, -10);
+        scene.add(rimLight);
+        
+        // Visual helpers for lights (optional, comment out for production)
+        // const lightHelper = new THREE.DirectionalLightHelper(mainLight, 1);
+        // scene.add(lightHelper);
+        
+        // ============ ENVIRONMENT ============
+        // Futuristic floor with grid
+        const gridHelper = new THREE.GridHelper(30, 20, 0x00ffff, 0x336699);
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+        
+        // Add a reflective floor plane
+        const floorGeometry = new THREE.PlaneGeometry(30, 30);
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x0a1a2a, 
+            roughness: 0.3, 
+            metalness: 0.7,
+            emissive: new THREE.Color(0x112233),
+            emissiveIntensity: 0.2,
+            transparent: true,
+            opacity: 0.8
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.5;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        
+        // Decorative floating orbs
+        const orbCount = 50;
+        const orbs = [];
+        for (let i = 0; i < orbCount; i++) {
+            const size = Math.random() * 0.1 + 0.05;
+            const orbGeometry = new THREE.SphereGeometry(size, 16, 16);
+            const orbMaterial = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(Math.random() * 0xffffff),
+                emissive: new THREE.Color(Math.random() * 0x444444),
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.6
+            });
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+            orb.position.x = (Math.random() - 0.5) * 40;
+            orb.position.y = Math.random() * 15;
+            orb.position.z = (Math.random() - 0.5) * 40 - 20;
+            orb.castShadow = true;
+            orb.receiveShadow = false;
+            scene.add(orb);
+            orbs.push({ mesh: orb, speed: Math.random() * 0.01 + 0.005, offset: Math.random() * Math.PI * 2 });
+        }
+
+        // ============ GAME STATE ============
+        const gameState = {
+            playerX: 0,
+            score: 0,
+            primesCollected: 0,
+            speed: 5,
+            gameActive: false,
+            keys: { left: false, right: false }
+        };
+
+        // ============ PLAYER (3D CUBE) ============
+        const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const playerMaterial = new THREE.MeshStandardMaterial({
+            color: 0x44aaff,
+            emissive: new THREE.Color(0x2266cc),
+            emissiveIntensity: 0.5,
+            roughness: 0.2,
+            metalness: 0.8
+        });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        player.castShadow = true;
+        player.receiveShadow = true;
+        player.position.y = 0.5;
+        player.position.z = 2;
+        scene.add(player);
+
+        // Add glow effect around player
+        const playerGlowGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+        const playerGlowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x44aaff,
+            transparent: true,
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const playerGlow = new THREE.Mesh(playerGlowGeometry, playerGlowMaterial);
+        player.add(playerGlow);
+
+        // ============ NUMBER OBJECTS ============
+        const numbers = [];
+        let lastSpawnTime = 0;
+        const spawnInterval = 30; // frames
+
+        function spawnNumber() {
+            const isPrime = Math.random() < 0.3; // 30% chance for prime
+            const value = isPrime ? 
+                [2,3,5,7,11,13,17,19,23,29][Math.floor(Math.random() * 10)] : 
+                [4,6,8,9,10,12,14,15,16,18][Math.floor(Math.random() * 10)];
+            
+            // Create 3D group for the number
+            const group = new THREE.Group();
+            
+            // Background sphere/cube with glow
+            let geometry;
+            if (isPrime) {
+                geometry = new THREE.IcosahedronGeometry(0.7, 1); // Cool shape for primes
+            } else {
+                geometry = new THREE.DodecahedronGeometry(0.7); // Different shape for composites
+            }
+            
+            const material = new THREE.MeshStandardMaterial({
+                color: isPrime ? 0x00ff88 : 0xff4466,
+                emissive: isPrime ? 0x00aa44 : 0xaa2222,
+                emissiveIntensity: 0.6,
+                roughness: 0.3,
+                metalness: 0.4,
+                transparent: true,
+                opacity: 0.95
+            });
+            
+            const core = new THREE.Mesh(geometry, material);
+            core.castShadow = true;
+            core.receiveShadow = true;
+            group.add(core);
+            
+            // Add outer glow ring
+            const ringGeometry = new THREE.TorusGeometry(0.9, 0.05, 16, 50);
+            const ringMaterial = new THREE.MeshStandardMaterial({
+                color: isPrime ? 0x00ffff : 0xff66aa,
+                emissive: isPrime ? 0x0088aa : 0xaa2266,
+                emissiveIntensity: 0.4,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.rotation.z = Math.PI / 4;
+            group.add(ring);
+            
+            // Add floating particles around
+            for (let i = 0; i < 4; i++) {
+                const particleGeo = new THREE.SphereGeometry(0.05, 6, 6);
+                const particleMat = new THREE.MeshStandardMaterial({
+                    color: isPrime ? 0x00ffff : 0xff88aa,
+                    emissive: isPrime ? 0x0088aa : 0xaa4488,
+                    emissiveIntensity: 0.8,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const particle = new THREE.Mesh(particleGeo, particleMat);
+                particle.position.set(
+                    Math.cos(i * Math.PI/2) * 1.2,
+                    Math.sin(i * Math.PI/2) * 1.2,
+                    0
+                );
+                group.add(particle);
+            }
+            
+            // Create text canvas for the number
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 48px "Orbitron", "Exo 2", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(value.toString(), 32, 32);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const textMaterial = new THREE.SpriteMaterial({ 
+                map: texture,
+                transparent: true,
+                depthTest: false,
+                depthWrite: false
+            });
+            const textSprite = new THREE.Sprite(textMaterial);
+            textSprite.scale.set(1.2, 1.2, 1);
+            textSprite.position.z = 0.2;
+            group.add(textSprite);
+            
+            // Position the group
+            group.position.x = (Math.random() - 0.5) * 12;
+            group.position.y = 0.7;
+            group.position.z = -20;
+            
+            scene.add(group);
+            
+            numbers.push({
+                group,
+                value,
+                isPrime,
+                speed: gameState.speed,
+                rotationSpeed: Math.random() * 0.1 + 0.05
+            });
+        }
+
+        // ============ INPUT HANDLING ============
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                gameState.keys.left = true;
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                gameState.keys.right = true;
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                gameState.keys.left = false;
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                gameState.keys.right = false;
+                e.preventDefault();
+            }
+        });
+
+        // Mobile controls
+        document.getElementById('leftBtn')?.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.left = true;
+        });
+        document.getElementById('leftBtn')?.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.left = false;
+        });
+        document.getElementById('rightBtn')?.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.right = true;
+        });
+        document.getElementById('rightBtn')?.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.right = false;
+        });
+
+        // Mouse/touch for desktop
+        document.getElementById('leftBtn')?.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keys.left = true;
+        });
+        document.getElementById('leftBtn')?.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keys.left = false;
+        });
+        document.getElementById('rightBtn')?.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keys.right = true;
+        });
+        document.getElementById('rightBtn')?.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keys.right = false;
+        });
+
+        // ============ UI CONTROLS ============
+        document.getElementById('startGameBtn')?.addEventListener('click', startGame);
+        document.getElementById('skipButton')?.addEventListener('click', () => {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loader').style.display = 'none';
+            }, 1000);
+        });
+        document.getElementById('howToPlayBtn')?.addEventListener('click', () => {
+            document.getElementById('menuScreen').classList.remove('active');
+            document.getElementById('howToPlayScreen').classList.add('active');
+        });
+        document.getElementById('backFromHowTo')?.addEventListener('click', () => {
+            document.getElementById('howToPlayScreen').classList.remove('active');
+            document.getElementById('menuScreen').classList.add('active');
+        });
+        document.getElementById('restartFromGameOver')?.addEventListener('click', startGame);
+        document.getElementById('menuFromGameOver')?.addEventListener('click', () => {
+            document.getElementById('gameOverScreen').classList.remove('active');
+            document.getElementById('menuScreen').classList.add('active');
+        });
+
+        function startGame() {
+            // Reset game state
+            gameState.score = 0;
+            gameState.primesCollected = 0;
+            gameState.speed = 5;
+            gameState.playerX = 0;
+            gameState.gameActive = true;
+            
+            // Clear existing numbers
+            numbers.forEach(n => scene.remove(n.group));
+            numbers.length = 0;
+            
+            // Update UI
+            document.getElementById('scoreValue').textContent = '0';
+            document.getElementById('primesValue').textContent = '0';
+            document.getElementById('speedValue').textContent = '5';
+            
+            // Hide screens
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            
+            // Reset player position
+            player.position.x = 0;
+        }
+
+        // ============ COLLISION DETECTION ============
+        function checkCollision(playerPos, numberGroup) {
+            const dx = playerPos.x - numberGroup.position.x;
+            const dz = playerPos.z - numberGroup.position.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            return distance < 1.2;
+        }
+
+        // ============ ANIMATION LOOP ============
+        let frame = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Animate floating orbs
+            orbs.forEach((orb, i) => {
+                orb.mesh.position.y += Math.sin(Date.now() * orb.speed + orb.offset) * 0.002;
+                orb.mesh.rotation.x += 0.005;
+                orb.mesh.rotation.y += 0.003;
+            });
+            
+            if (gameState.gameActive) {
+                // Move player
+                const moveSpeed = 0.3;
+                if (gameState.keys.left) gameState.playerX -= moveSpeed;
+                if (gameState.keys.right) gameState.playerX += moveSpeed;
+                gameState.playerX = Math.max(-6, Math.min(6, gameState.playerX));
+                player.position.x = gameState.playerX;
+                
+                // Animate player bob
+                player.position.y = 0.5 + Math.sin(Date.now() * 0.01) * 0.1;
+                player.rotation.x = Math.sin(Date.now() * 0.005) * 0.1;
+                player.rotation.z = Math.sin(Date.now() * 0.005) * 0.1;
+                
+                // Spawn numbers
+                frame++;
+                if (frame % Math.max(20, Math.floor(40 - gameState.speed / 2)) === 0) {
+                    spawnNumber();
+                }
+                
+                // Update numbers
+                for (let i = numbers.length - 1; i >= 0; i--) {
+                    const n = numbers[i];
+                    n.group.position.z += gameState.speed * 0.05;
+                    
+                    // Rotate number
+                    n.group.rotation.x += n.rotationSpeed;
+                    n.group.rotation.y += n.rotationSpeed * 0.5;
+                    n.group.rotation.z += n.rotationSpeed * 0.3;
+                    
+                    // Check collision
+                    if (checkCollision(player.position, n.group)) {
+                        if (n.isPrime) {
+                            gameState.score += 10;
+                            gameState.primesCollected++;
+                            // Visual feedback - create explosion of particles
+                            createExplosion(n.group.position.clone(), 0x00ff88);
+                        } else {
+                            gameState.score -= 5;
+                            // Visual feedback - create explosion of particles
+                            createExplosion(n.group.position.clone(), 0xff4466);
+                        }
+                        
+                        // Update UI
+                        document.getElementById('scoreValue').textContent = gameState.score;
+                        document.getElementById('primesValue').textContent = gameState.primesCollected;
+                        
+                        // Increase speed every 100 points
+                        gameState.speed = 5 + Math.floor(gameState.score / 100);
+                        document.getElementById('speedValue').textContent = gameState.speed;
+                        
+                        // Remove number
+                        scene.remove(n.group);
+                        numbers.splice(i, 1);
+                    }
+                    
+                    // Remove if past player
+                    if (n.group.position.z > 10) {
+                        scene.remove(n.group);
+                        numbers.splice(i, 1);
+                    }
+                }
+                
+                // Camera follow (subtle)
+                camera.position.x = gameState.playerX * 0.3;
+                camera.lookAt(gameState.playerX * 0.3, 0, 5);
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // ============ EFFECTS ============
+        function createExplosion(position, color) {
+            const particleCount = 15;
+            for (let i = 0; i < particleCount; i++) {
+                const particleGeo = new THREE.SphereGeometry(0.1, 4, 4);
+                const particleMat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.8,
+                    transparent: true,
+                    opacity: 1
+                });
+                const particle = new THREE.Mesh(particleGeo, particleMat);
+                particle.position.copy(position);
+                particle.castShadow = true;
+                particle.receiveShadow = true;
+                scene.add(particle);
+                
+                // Animate particle
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 0.2 + 0.1;
+                const vx = Math.cos(angle) * speed;
+                const vz = Math.sin(angle) * speed;
+                const vy = Math.random() * 0.2;
+                
+                let life = 30;
+                function moveParticle() {
+                    if (life > 0) {
+                        particle.position.x += vx;
+                        particle.position.y += vy;
+                        particle.position.z += vz;
+                        particle.material.opacity = life / 30;
+                        life--;
+                        requestAnimationFrame(moveParticle);
+                    } else {
+                        scene.remove(particle);
+                    }
+                }
+                requestAnimationFrame(moveParticle);
+            }
+        }
+
+        // ============ LOADER PROGRESS ============
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 10;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(progressInterval);
+                setTimeout(() => {
+                    document.getElementById('loader').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('loader').style.display = 'none';
+                    }, 1000);
+                }, 500);
+            }
+            document.getElementById('progress-bar').style.width = progress + '%';
+        }, 200);
+
+        // ============ WINDOW RESIZE ============
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
